@@ -10,3 +10,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "main"
 path = "src/main.rs"
+
+[dependencies]
+serialport = "3.3.0"
+clap = "2.33.3"
