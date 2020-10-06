@@ -1,15 +1,16 @@
 extern crate byteorder;
 extern crate chrono;
+extern crate crc8;
 extern crate csv;
 extern crate serialport;
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::prelude::*;
+use crc8::*;
 use csv::Writer;
 use serialport::prelude::*;
 use std::fs::File;
 use std::io::{self};
-use std::string;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 static PREAMBULA: &'static [u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
@@ -75,17 +76,17 @@ fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>) -> 
     let time = LittleEndian::read_i64(time_array);
     println!("Timestamp:{}", time);
 
-    // Create a NaiveDateTime from the timestamp
-    let naive = NaiveDateTime::from_timestamp(time / 1000, 0);
+    // // Create a NaiveDateTime from the timestamp
+    // let naive = NaiveDateTime::from_timestamp(time / 1000, 0);
 
-    // Create a normal DateTime from the NaiveDateTime
-    let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
+    // // Create a normal DateTime from the NaiveDateTime
+    // let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
 
-    // Format the datetime how you want
-    let newdate = datetime.format("%Y-%m-%d %H:%M:%S");
+    // // Format the datetime how you want
+    // let newdate = datetime.format("%Y-%m-%d %H:%M:%S");
 
-    // Print the newly formatted date and time
-    println!("{}", newdate);
+    // // Print the newly formatted date and time
+    // println!("{}", newdate);
     let mut buffer_array: [u32; 1024] = [0; 1024];
 
     for i in 0..(ARRAYS_SIZE) / 2 {
@@ -101,6 +102,23 @@ fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>) -> 
 fn do_write(writer: &mut csv::Writer<File>, buf: &[u32]) {
   // The error is coming from this line
   let new_string = format!("{:?}", buf);
-  writer.serialize(&new_string);
+  let _r = writer.serialize(&new_string);
   writer.flush().unwrap();
+}
+fn CRC8(buff: &[u8], lenght: i32) {
+  /* Init Crc8 module for given polynomial in regular bit order. */
+  let mut crc8 = Crc8::create_lsb(130);
+
+  /* calculate a crc8 over the given input data.
+   * pbuffer: pointer to data buffer.
+   * length: number of bytes in data buffer.
+   * crc:	previous returned crc8 value.
+   */
+  let mut crc = crc8.calc(&buff, lenght, 0);
+  println!("crc8: {}", crc);
+
+  /* Init Crc8 module for given polynomial in reverse bit order. */
+  crc8 = Crc8::create_msb(130);
+  crc = crc8.calc(&buff, 3, 0);
+  println!("crc8: {}", crc);
 }
