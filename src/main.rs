@@ -1,12 +1,9 @@
 extern crate byteorder;
 extern crate chrono;
-extern crate crc8;
 extern crate csv;
 extern crate serialport;
 
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::prelude::*;
-use crc8::*;
 use csv::Writer;
 use serialport::prelude::*;
 use std::fs::File;
@@ -28,7 +25,7 @@ fn main() {
     stop_bits: StopBits::One,
     timeout: Duration::from_millis(500),
   };
-  let port = serialport::open_with_settings("COM5", &s);
+  let port = serialport::open_with_settings("COM10", &s);
   match port {
     Ok(mut _port) => {
       let start = SystemTime::now();
@@ -46,7 +43,7 @@ fn main() {
       println!("Receiving data:");
       loop {
         match _port.read(serial_buf.as_mut_slice()) {
-          Ok(_t) => process_data(&serial_buf, &mut writer), //io::stdout().write_all(&serial_buf[..t]).unwrap(),
+          Ok(t) => process_data(&serial_buf, &mut writer, t), //io::stdout().write_all(&serial_buf[..t]).unwrap(),
           Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
           Err(e) => eprintln!("{:?}", e),
         }
@@ -60,18 +57,18 @@ fn main() {
   }
 }
 
-fn process_data(n: &Vec<u8>, writer: &mut csv::Writer<File>) -> () {
+fn process_data(n: &Vec<u8>, writer: &mut csv::Writer<File>, t: usize) -> () {
   for i in 0..n.len() - PREAMB_SIZE {
     if n[i..i + 7] == (PREAMBULA[..PREAMBULA.len() - 1]) {
-      process_time(n, i, writer);
+      process_time(n, i, writer, t);
     } else {
       //println!("None found");
     }
   }
 }
 
-fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>) -> () {
-  if n.len() > (START_SIZE) {
+fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>, t: usize) -> () {
+  if t >= (start_i + START_SIZE + ARRAYS_SIZE + 2) {
     let time_array = &n[start_i + PREAMB_SIZE..start_i + START_SIZE];
     let time = LittleEndian::read_i64(time_array);
     println!("Timestamp:{}", time);
@@ -94,31 +91,28 @@ fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>) -> 
       let first_number = LittleEndian::read_u16(first_number_array);
       buffer_array[i] = first_number as u32;
     }
-    println!("Receiving data:{}", buffer_array[0]);
-    do_write(writer, &buffer_array);
+    let crc_from_array = LittleEndian::read_u16(
+      &n[start_i + START_SIZE + ARRAYS_SIZE..start_i + START_SIZE + ARRAYS_SIZE + 2],
+    );
+
+    // use provided or custom polynomial
+    let mut crc: u32 = 0;
+    for i in 0..ARRAYS_SIZE {
+      crc = (crc + n[start_i + START_SIZE + i] as u32) % 65536;
+    }
+    if crc == crc_from_array as u32 {
+      println!("crc8: {}", crc);
+      println!("Receiving data:{}", buffer_array[0]);
+      do_write(writer, &buffer_array);
+    }
   }
 }
 
 fn do_write(writer: &mut csv::Writer<File>, buf: &[u32]) {
-  // The error is coming from this line
-  let new_string = format!("{:?}", buf);
+  // The error is coming from this .
+  let mut new_string = format!("{:?}", buf);
+  new_string = new_string.trim_start_matches('[').to_string();
+  new_string = new_string.trim_end_matches(']').to_string();
   let _r = writer.serialize(&new_string);
   writer.flush().unwrap();
-}
-fn CRC8(buff: &[u8], lenght: i32) {
-  /* Init Crc8 module for given polynomial in regular bit order. */
-  let mut crc8 = Crc8::create_lsb(130);
-
-  /* calculate a crc8 over the given input data.
-   * pbuffer: pointer to data buffer.
-   * length: number of bytes in data buffer.
-   * crc:	previous returned crc8 value.
-   */
-  let mut crc = crc8.calc(&buff, lenght, 0);
-  println!("crc8: {}", crc);
-
-  /* Init Crc8 module for given polynomial in reverse bit order. */
-  crc8 = Crc8::create_msb(130);
-  crc = crc8.calc(&buff, 3, 0);
-  println!("crc8: {}", crc);
 }
