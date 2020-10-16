@@ -14,7 +14,7 @@ static PREAMBULA: &'static [u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x
 static PREAMB_SIZE: usize = 8;
 static TIME_SIZE: usize = 8;
 static START_SIZE: usize = TIME_SIZE + PREAMB_SIZE;
-static ARRAYS_SIZE: usize = 2048;
+static ARRAYS_SIZE: usize = 20;
 
 fn main() {
   let s = SerialPortSettings {
@@ -25,7 +25,7 @@ fn main() {
     stop_bits: StopBits::One,
     timeout: Duration::from_millis(500),
   };
-  let port = serialport::open_with_settings("COM10", &s);
+  let port = serialport::open_with_settings("COM7", &s);
   match port {
     Ok(mut _port) => {
       let start = SystemTime::now();
@@ -84,35 +84,43 @@ fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>, t: 
 
     // // Print the newly formatted date and time
     // println!("{}", newdate);
-    let mut buffer_array: [u32; 1024] = [0; 1024];
+    let mut buffer_array: [i32; 100] = [0; 100];
 
-    for i in 0..(ARRAYS_SIZE) / 2 {
-      let first_number_array = &n[start_i + START_SIZE + i * 2..start_i + START_SIZE + i * 2 + 2];
-      let first_number = LittleEndian::read_u16(first_number_array);
-      buffer_array[i] = first_number as u32;
+    for i in 0..(ARRAYS_SIZE) / 4 {
+      let first_number_array = &n[start_i + START_SIZE + i * 4..start_i + START_SIZE + i * 4 + 4];
+      let first_number = LittleEndian::read_i32(first_number_array);
+      buffer_array[i] = first_number as i32;
     }
-    let crc_from_array = LittleEndian::read_u16(
+    let crc_from_array = LittleEndian::read_i16(
       &n[start_i + START_SIZE + ARRAYS_SIZE..start_i + START_SIZE + ARRAYS_SIZE + 2],
     );
 
     // use provided or custom polynomial
-    let mut crc: u32 = 0;
-    for i in 0..ARRAYS_SIZE {
-      crc = (crc + n[start_i + START_SIZE + i] as u32) % 65536;
+    let mut crc: i64 = 0;
+    for i in 0..ARRAYS_SIZE / 4 {
+      crc = (crc + buffer_array[i] as i64) % 65536;
     }
-    if crc == crc_from_array as u32 {
-      println!("crc8: {}", crc);
-      println!("Receiving data:{}", buffer_array[0]);
-      do_write(writer, &buffer_array);
+    if crc == crc_from_array as i64 {
+      if (buffer_array[0] != 0)
+        && (buffer_array[1] != 0)
+        && (buffer_array[2] != 0)
+        && (buffer_array[3] != 0)
+        && (buffer_array[4] != 0)
+      {
+        println!("crc8: {}", crc);
+        println!("Receiving data:{}", buffer_array[0]);
+        do_write(writer, &buffer_array);
+      }
     }
   }
 }
 
-fn do_write(writer: &mut csv::Writer<File>, buf: &[u32]) {
+fn do_write(writer: &mut csv::Writer<File>, buf: &[i32]) {
   // The error is coming from this .
   let mut new_string = format!("{:?}", buf);
   new_string = new_string.trim_start_matches('[').to_string();
   new_string = new_string.trim_end_matches(']').to_string();
+  new_string = new_string.replace(",", ";");
   let _r = writer.serialize(&new_string);
   writer.flush().unwrap();
 }
