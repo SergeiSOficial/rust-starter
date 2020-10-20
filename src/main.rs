@@ -14,7 +14,7 @@ static PREAMBULA: &'static [u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x
 static PREAMB_SIZE: usize = 8;
 static TIME_SIZE: usize = 8;
 static START_SIZE: usize = TIME_SIZE + PREAMB_SIZE;
-static ARRAYS_SIZE: usize = 20;
+static ARRAYS_SIZE: usize = 80;
 
 fn main() {
   let s = SerialPortSettings {
@@ -84,21 +84,21 @@ fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>, t: 
 
     // // Print the newly formatted date and time
     // println!("{}", newdate);
-    let mut buffer_array: [i32; 100] = [0; 100];
+    let mut buffer_array: [i32; 20] = [0; 20];
 
     for i in 0..(ARRAYS_SIZE) / 4 {
       let first_number_array = &n[start_i + START_SIZE + i * 4..start_i + START_SIZE + i * 4 + 4];
       let first_number = LittleEndian::read_i32(first_number_array);
       buffer_array[i] = first_number as i32;
     }
-    let crc_from_array = LittleEndian::read_i16(
-      &n[start_i + START_SIZE + ARRAYS_SIZE..start_i + START_SIZE + ARRAYS_SIZE + 2],
+    let crc_from_array = LittleEndian::read_i32(
+      &n[start_i + START_SIZE + ARRAYS_SIZE..start_i + START_SIZE + ARRAYS_SIZE + 4],
     );
 
     // use provided or custom polynomial
     let mut crc: i64 = 0;
     for i in 0..ARRAYS_SIZE / 4 {
-      crc = (crc + buffer_array[i] as i64) % 65536;
+      crc = crc + buffer_array[i] as i64;
     }
     if crc == crc_from_array as i64 {
       if (buffer_array[0] != 0)
