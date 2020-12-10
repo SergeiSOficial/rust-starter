@@ -102,6 +102,10 @@ fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>, t: 
       crc = ((crc as u32 + buffer_array[i] as u32) & 0xff) as u8;
     }
     if crc == crc_from_array as u8 {
+      buffer_array[0] = time_array[0] as u8;
+      buffer_array[1] = time_array[1] as u8;
+      buffer_array[2] = time_array[2] as u8;
+      buffer_array[3] = time_array[3] as u8;
       println!("crc8: {}", crc);
       println!("Receiving data:{}", buffer_array[0]);
       do_write(writer, &buffer_array);
