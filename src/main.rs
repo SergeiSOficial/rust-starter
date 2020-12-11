@@ -106,8 +106,17 @@ fn process_time(n: &Vec<u8>, start_i: usize, writer: &mut csv::Writer<File>, t: 
       buffer_array[1] = time_array[1] as u8;
       buffer_array[2] = time_array[2] as u8;
       buffer_array[3] = time_array[3] as u8;
+      let curretn_ch0 = LittleEndian::read_u32(&buffer_array[17 * 4 + 1..18 * 4 + 1]);
+      let curretn_ch1 = LittleEndian::read_u32(&buffer_array[18 * 4 + 1..19 * 4 + 1]);
+      let curretn_ch2 = LittleEndian::read_u32(&buffer_array[19 * 4 + 1..20 * 4 + 1]);
+      let curretn_ch3 = LittleEndian::read_u32(&buffer_array[20 * 4 + 1..21 * 4 + 1]);
+
       println!("crc8: {}", crc);
       println!("Receiving data:{}", buffer_array[0]);
+      println!(
+        "RMS0:{}    RMS1:{}     RMS2:{}    RMS3:{}    ",
+        curretn_ch0, curretn_ch1, curretn_ch2, curretn_ch3
+      );
       do_write(writer, &buffer_array);
     }
   }
